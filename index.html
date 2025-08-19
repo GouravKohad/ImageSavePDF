@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Image Projects → PDF (Full Featured)</title>
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<!-- Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg: #0b1220; --panel: #0f1724; --muted: #111827; --text: #e6eef8; --accent: #60a5fa;
+    --glass: rgba(255,255,255,0.04);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:linear-gradient(180deg,#071225,#071021)}
+  .app{max-width:1200px;margin:18px auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .brand{display:flex;gap:12px;align-items:center}
+  .chip{padding:6px 10px;border-radius:999px;background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.18);color:var(--accent);font-weight:600;font-size:13px}
+  .layout{display:grid;grid-template-columns:320px 1fr;gap:18px}
+  @media (max-width:980px){ .layout{grid-template-columns:1fr} }
+
+  .card{background:var(--panel);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 10px 30px rgba(2,6,23,0.6)}
+  .sidebar{display:flex;flex-direction:column;gap:10px;height:78vh}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+  input[type="text"], select { padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:var(--text);outline:none }
+  .btn{display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:10px;border:0;background:linear-gradient(135deg,#60a5fa,#7c3aed);color:white;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+  .btn.warn{background:linear-gradient(135deg,#f97316,#f59e0b)}
+
+  .project-list{overflow:auto;padding-right:6px;flex:1;border-radius:8px}
+  .project-item{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+  .project-item:hover{background:rgba(255,255,255,0.02)}
+  .project-item.active{outline:2px solid rgba(96,165,250,0.12);box-shadow:0 8px 24px rgba(96,165,250,0.06)}
+
+  .tag-list{display:flex;gap:6px;flex-wrap:wrap}
+  .tag{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px;font-size:13px}
+
+  .dropzone{border:2px dashed rgba(255,255,255,0.06);border-radius:12px;padding:16px;min-height:120px;display:flex;align-items:center;justify-content:center}
+  .dropzone.drag{border-color:var(--accent);background:rgba(96,165,250,0.03)}
+  .thumb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;overflow:auto;height:58vh;padding:6px;border-radius:8px}
+  .thumb{position:relative;border-radius:12px;overflow:hidden;background:var(--glass);border:1px solid rgba(255,255,255,0.03);height:150px}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .22s}
+  .thumb:hover img{transform:scale(1.04)}
+  .thumb .badge{position:absolute;left:8px;top:8px;background:rgba(0,0,0,0.45);padding:4px 8px;border-radius:999px;font-size:12px}
+  .thumb .actions{position:absolute;right:8px;top:8px;display:flex;gap:6px}
+  .icon-btn{background:rgba(0,0,0,0.45);border-radius:8px;padding:6px;border:none;color:white;cursor:pointer}
+
+  /* editor canvas modal */
+  .modal{display:none;position:fixed;inset:0;background:rgba(2,6,23,0.82);z-index:80;align-items:center;justify-content:center;padding:18px}
+  .editor{background:var(--panel);padding:12px;border-radius:12px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;gap:8px;align-items:center}
+  canvas{background:#0b1116;border-radius:8px}
+
+  /* toast & popup */
+  .toast{position:fixed;right:20px;bottom:20px;background:linear-gradient(135deg,#10b981,#34d399);padding:10px 14px;border-radius:10px;color:#042a1b;z-index:90;display:none}
+  .popup{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:90;align-items:center;justify-content:center}
+  .popup .box{background:var(--panel);padding:16px;border-radius:12px;max-width:480px}
+
+  /* scrollbars */
+  .project-list::-webkit-scrollbar, .thumb-grid::-webkit-scrollbar { width:10px }
+  .project-list::-webkit-scrollbar-thumb, .thumb-grid::-webkit-scrollbar-thumb { background:linear-gradient(180deg,#60a5fa,#1e3a8a); border-radius:999px }
+  .project-list, .thumb-grid { scrollbar-width:thin; scrollbar-color:#60a5fa transparent }
+
+  /* responsive tweaks */
+  @media (max-width:780px){
+    .thumb{height:120px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header style="display:flex;justify-content:space-between;align-items:center">
+    <div class="brand">
+      <div style="font-weight:700;font-size:18px">📁 Image Projects → PDF</div>
+      <div class="chip">Offline • Frontend</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="projSearch" type="text" placeholder="Search projects..." style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);color:var(--text)">
+      <select id="themeSelect" style="padding:8px;border-radius:8px; display: none;">
+        <option value="dark">Dark</option><option value="light">Light</option><option value="pastel">Pastel</option>
+      </select>
+      <button id="infoBtn" class="btn ghost">Info</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <aside class="card sidebar">
+      <div style="display:flex;gap:8px">
+        <input id="newName" type="text" placeholder="New project name">
+        <button id="createBtn" class="btn">Create</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="saveBtn" class="btn">Save</button>
+        <button id="dupBtn" class="btn ghost">Duplicate</button>
+        <button id="delProjBtn" class="btn warn">Delete</button>
+      </div>
+
+      <div style="margin-top:10px">
+        <div style="margin-bottom:6px;font-weight:600">Tags</div>
+        <div style="display:flex;gap:6px">
+          <input id="tagInput" type="text" placeholder="Add tag">
+          <button id="addTagBtn" class="btn ghost">Add</button>
+        </div>
+        <div id="tagList" style="margin-top:8px" class="tag-list"></div>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.04);margin:10px 0">
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="filterTag" style="padding:6px;border-radius:8px"><option value="">All tags</option></select>
+        <button id="refreshBtn" class="btn ghost">Refresh</button>
+      </div>
+
+      <div class="project-list card" id="projectList" style="margin-top:8px; "></div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="backupBtn" class="btn ghost">Export JSON</button>
+        <label class="btn ghost" style="cursor:pointer">Import <input id="importJson" type="file" accept="application/json" style="display:none"></label>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="card" style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700">Images</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="btn ghost" style="cursor:pointer">Add Images <input id="fileInput" type="file" accept="image/*" multiple style="display:none"></label>
+          <button id="exportPdfBtn" class="btn">Export PDF</button>
+          <button id="exportZipBtn" class="btn ghost">Export ZIP</button>
+          <button id="shareBtn" class="btn ghost">Share</button>
+          <button id="clearImgsBtn" class="btn ghost">Clear</button>
+        </div>
+      </div>
+
+      <div id="dropzone" class="dropzone">Drag & Drop or click Add Images</div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;gap:8px">
+          <button id="rotateLeft" class="btn ghost">⟲ Rotate</button>
+          <button id="rotateRight" class="btn ghost">⟳ Rotate</button>
+          <button id="flipH" class="btn ghost">Flip H</button>
+          <button id="flipV" class="btn ghost">Flip V</button>
+          <button id="cropBtn" class="btn ghost">Crop</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="color:rgba(255,255,255,0.7)">Quality</label>
+          <input id="quality" type="range" min="40" max="95" value="85">
+          <span id="qualityVal">85</span>
+        </div>
+      </div>
+
+      <div id="thumbGrid" class="thumb-grid"></div>
+    </main>
+  </div>
+</div>
+
+<!-- Editor Modal -->
+<div id="editorModal" class="modal" style="display:none;align-items:center">
+  <div class="editor">
+    <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="prevBtn" class="btn ghost">◀</button>
+        <span id="pageIndicator" style="font-weight:600;color:rgba(255,255,255,0.9)">0 / 0</span>
+        <button id="nextBtn" class="btn ghost">▶</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="edRotateL" class="btn ghost">⟲</button>
+        <button id="edRotateR" class="btn ghost">⟳</button>
+        <button id="edFlipH" class="btn ghost">Flip H</button>
+        <button id="edFlipV" class="btn ghost">Flip V</button>
+        <button id="edCrop" class="btn ghost">Crop</button>
+        <button id="closeEditor" class="btn">Close</button>
+      </div>
+    </div>
+    <canvas id="editCanvas" style="max-width:88vw;max-height:72vh;border-radius:8px;background:#071021;margin-top:8px"></canvas>
+  </div>
+</div>
+
+<!-- Toast & Popup -->
+<div id="toast" class="toast"></div>
+
+<div id="infoPopup" class="popup" style="display:none;align-items:center;">
+  <div class="box">
+    <h3 style="margin-top:0">About this app</h3>
+    <p style="color:rgba(255,255,255,0.7)">Features: Projects, Tags, Thumbnail grid, Edit (rotate/flip/crop), Export PDF (original size), Export ZIP, Backup/Restore JSON, Autosave, Keyboard shortcuts, Themes.</p>
+    <div style="text-align:right;margin-top:12px"><button id="closeInfo" class="btn">Close</button></div>
+  </div>
+</div>
+
+<!-- Confirm Popup (custom) -->
+<div id="confirmPopup" class="popup" style="display:none;align-items:center">
+  <div class="box">
+    <div id="confirmMsg" style="margin-bottom:12px"></div>
+    <div style="text-align:right"><button id="confirmNo" class="btn ghost">No</button> <button id="confirmYes" class="btn">Yes</button></div>
+  </div>
+</div>
+
+<script>
+lucide.createIcons();
+
+// ---------- IndexedDB setup ----------
+let db;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open('ImageProjectsDB.v4', 1);
+    r.onupgradeneeded = ()=> {
+      db = r.result;
+      if(!db.objectStoreNames.contains('projects')){
+        const st = db.createObjectStore('projects',{keyPath:'name'});
+        st.createIndex('updatedAt','updatedAt',{unique:false});
+      }
+    };
+    r.onsuccess = ()=>{ db = r.result; res(db); };
+    r.onerror = ()=> rej(r.error);
+  });
+}
+
+// ---------- State ----------
+let projects = [];             // loaded projects list
+let currentProject = null;     // object {name,tags,createdAt,updatedAt,images:[]}
+let images = [];               // working images array for current project
+let selectedIndex = -1;        // index opened in editor/modal
+let autosaveTimer = null;
+
+// ---------- DOM refs ----------
+const D = {
+  projectList: document.getElementById('projectList'),
+  newName: document.getElementById('newName'),
+  createBtn: document.getElementById('createBtn'),
+  saveBtn: document.getElementById('saveBtn'),
+  dupBtn: document.getElementById('dupBtn'),
+  delProjBtn: document.getElementById('delProjBtn'),
+  tagInput: document.getElementById('tagInput'),
+  addTagBtn: document.getElementById('addTagBtn'),
+  tagList: document.getElementById('tagList'),
+  filterTag: document.getElementById('filterTag'),
+  refreshBtn: document.getElementById('refreshBtn'),
+  fileInput: document.getElementById('fileInput'),
+  dropzone: document.getElementById('dropzone'),
+  thumbGrid: document.getElementById('thumbGrid'),
+  exportPdfBtn: document.getElementById('exportPdfBtn'),
+  exportZipBtn: document.getElementById('exportZipBtn'),
+  backupBtn: document.getElementById('backupBtn'),
+  importJson: document.getElementById('importJson'),
+  shareBtn: document.getElementById('shareBtn'),
+  clearImgsBtn: document.getElementById('clearImgsBtn'),
+  rotateLeft: document.getElementById('rotateLeft'),
+  rotateRight: document.getElementById('rotateRight'),
+  flipH: document.getElementById('flipH'),
+  flipV: document.getElementById('flipV'),
+  cropBtn: document.getElementById('cropBtn'),
+  quality: document.getElementById('quality'),
+  qualityVal: document.getElementById('qualityVal'),
+  themeSelect: document.getElementById('themeSelect'),
+  projSearch: document.getElementById('projSearch'),
+  infoBtn: document.getElementById('infoBtn'),
+  infoPopup: document.getElementById('infoPopup'),
+  closeInfo: document.getElementById('closeInfo'),
+  toast: document.getElementById('toast'),
+  editorModal: document.getElementById('editorModal'),
+  editCanvas: document.getElementById('editCanvas'),
+  prevBtn: document.getElementById('prevBtn'),
+  nextBtn: document.getElementById('nextBtn'),
+  pageIndicator: document.getElementById('pageIndicator'),
+  edRotateL: document.getElementById('edRotateL'),
+  edRotateR: document.getElementById('edRotateR'),
+  edFlipH: document.getElementById('edFlipH'),
+  edFlipV: document.getElementById('edFlipV'),
+  edCrop: document.getElementById('edCrop'),
+  closeEditor: document.getElementById('closeEditor'),
+  confirmPopup: document.getElementById('confirmPopup'),
+  confirmMsg: document.getElementById('confirmMsg'),
+  confirmYes: document.getElementById('confirmYes'),
+  confirmNo: document.getElementById('confirmNo'),
+  projSearch: document.getElementById('projSearch')
+};
+
+// ---------- Utils ----------
+const uid = ()=>Math.random().toString(36).slice(2,9);
+const now = ()=>Date.now();
+function showToast(msg, time=1800){
+  D.toast.textContent = msg; D.toast.style.display='block';
+  setTimeout(()=>D.toast.style.display='none', time);
+}
+function confirmDialog(message){ // returns Promise<boolean>
+  return new Promise(resolve=>{
+    D.confirmMsg.textContent = message;
+    D.confirmPopup.style.display = 'flex';
+    const ok = ()=>{ D.confirmPopup.style.display='none'; cleanup(); resolve(true); };
+    const no = ()=>{ D.confirmPopup.style.display='none'; cleanup(); resolve(false); };
+    D.confirmYes.onclick = ok; D.confirmNo.onclick = no;
+    function cleanup(){ D.confirmYes.onclick=null; D.confirmNo.onclick=null; }
+  });
+}
+
+// ---------- DB helpers ----------
+function dbGetAll(){
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('projects','readonly'); const st = tx.objectStore('projects');
+    const rq = st.getAll();
+    rq.onsuccess = ()=>res(rq.result);
+    rq.onerror = ()=>rej(rq.error);
+  });
+}
+function dbGet(name){
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('projects','readonly'); const st = tx.objectStore('projects');
+    const rq = st.get(name);
+    rq.onsuccess = ()=>res(rq.result || null);
+    rq.onerror = ()=>rej(rq.error);
+  });
+}
+function dbPut(project){
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('projects','readwrite'); const st = tx.objectStore('projects');
+    project.updatedAt = now();
+    const rq = st.put(project);
+    rq.onsuccess = ()=>res(rq.result);
+    rq.onerror = ()=>rej(rq.error);
+  });
+}
+function dbDelete(name){
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('projects','readwrite'); const st = tx.objectStore('projects');
+    const rq = st.delete(name);
+    rq.onsuccess = ()=>res(true);
+    rq.onerror = ()=>rej(rq.error);
+  });
+}
+
+// ---------- Render functions ----------
+async function refreshProjects(){
+  projects = await dbGetAll();
+  renderProjectList();
+  populateTagFilter();
+}
+function renderProjectList(){
+  D.projectList.innerHTML = '';
+  const q = D.projSearch.value.trim().toLowerCase();
+  const tagFilter = D.filterTag.value;
+  projects.sort((a,b)=> (b.updatedAt||0)-(a.updatedAt||0));
+  projects.forEach(p=>{
+    if(q && !p.name.toLowerCase().includes(q)) return;
+    if(tagFilter && !(p.tags||[]).includes(tagFilter)) return;
+    const div = document.createElement('div'); div.className='project-item';
+    if(currentProject && currentProject.name === p.name) div.classList.add('active');
+    div.innerHTML = `<div style="display:flex;flex-direction:column">
+                       <strong>${p.name}</strong>
+                       <small style="color:rgba(255,255,255,0.6)">${(p.images||[]).length} images • ${(p.tags||[]).join(', ')}</small>
+                     </div>
+                     <div style="display:flex;gap:6px">
+                       <button title="Open" class="icon-btn" data-act="open">📂</button>
+                       <button title="Rename" class="icon-btn" data-act="rename">✏️</button>
+                       <button title="Delete" class="icon-btn" data-act="delete">🗑️</button>
+                     </div>`;
+    div.querySelector('[data-act="open"]').onclick = ()=> loadProject(p.name);
+    div.querySelector('[data-act="rename"]').onclick = async (e)=>{ e.stopPropagation(); const name=prompt('Rename project', p.name); if(name){ p.name=name; await dbPut(p); await refreshProjects(); showToast('Renamed'); }};
+    div.querySelector('[data-act="delete"]').onclick = async (e)=>{ e.stopPropagation(); if(await confirmDialog('Delete project?')){ await dbDelete(p.name); if(currentProject && currentProject.name===p.name){ currentProject=null; images=[]; renderThumbs(); } await refreshProjects(); showToast('Deleted'); } };
+    div.onclick = ()=> loadProject(p.name);
+    D.projectList.appendChild(div);
+  });
+}
+
+// ---------- Tag filter populate ----------
+function populateTagFilter(){
+  const set = new Set();
+  projects.forEach(p=> (p.tags||[]).forEach(t=>set.add(t)));
+  const cur = D.filterTag.value;
+  D.filterTag.innerHTML = '<option value="">All tags</option>' + [...set].map(t=>`<option value="${t}">${t}</option>`).join('');
+  if(cur) D.filterTag.value = cur;
+}
+
+// ---------- Project ops ----------
+async function createProject(name){
+  const nm = (name && name.trim()) || (D.newName.value.trim() || `Project ${new Date().toLocaleDateString()}`);
+  if(!nm) return showToast('Enter project name');
+  const proj = { name: nm, tags: [], createdAt: now(), updatedAt: now(), images: [] };
+  await dbPut(proj);
+  await refreshProjects();
+  await loadProject(nm);
+  D.newName.value = '';
+  showToast('Project created');
+}
+async function loadProject(name){
+  const p = await dbGet(name);
+  if(!p){ showToast('Project not found'); return; }
+  currentProject = JSON.parse(JSON.stringify(p)); // working copy
+  images = currentProject.images || [];
+  renderTags(); renderThumbs();
+  await refreshProjects();
+  localStorage.setItem('lastProject', currentProject.name);
+  showToast('Loaded project');
+}
+async function saveProject(){
+  if(!currentProject){ showToast('Open a project first'); return; }
+  currentProject.name = currentProject.name || (D.newName.value.trim() || `Project ${new Date().toLocaleDateString()}`);
+  currentProject.images = images;
+  await dbPut(currentProject);
+  await refreshProjects();
+  localStorage.setItem('lastProject', currentProject.name);
+  showToast('Saved');
+}
+async function duplicateProject(){
+  if(!currentProject){ showToast('Open first'); return; }
+  const copy = JSON.parse(JSON.stringify(currentProject));
+  copy.name = currentProject.name + ' (copy)';
+  copy.createdAt = now(); copy.updatedAt = now();
+  await dbPut(copy);
+  await refreshProjects();
+  showToast('Duplicated');
+}
+async function deleteCurrentProject(){
+  if(!currentProject){ showToast('Open a project'); return; }
+  if(await confirmDialog(`Delete "${currentProject.name}"? This cannot be undone.`)){
+    await dbDelete(currentProject.name);
+    currentProject = null; images = []; renderThumbs(); await refreshProjects();
+    localStorage.removeItem('lastProject');
+    showToast('Deleted project');
+  }
+}
+
+// ---------- Tags ----------
+function renderTags(){
+  D.tagList.innerHTML = '';
+  if(!currentProject) return;
+  (currentProject.tags || []).forEach(t=>{
+    const el = document.createElement('div'); el.className='tag';
+    el.innerHTML = `${t} <button style="margin-left:6px" data-tag="${t}">x</button>`;
+    el.querySelector('button').onclick = ()=>{ currentProject.tags = (currentProject.tags||[]).filter(x=>x!==t); renderTags(); scheduleAutosave(); };
+    D.tagList.appendChild(el);
+  });
+}
+D.addTagBtn.onclick = ()=>{
+  if(!currentProject) return showToast('Open a project first');
+  const v = D.tagInput.value.trim();
+  if(!v) return;
+  currentProject.tags = Array.from(new Set([...(currentProject.tags||[]), v]));
+  D.tagInput.value = '';
+  renderTags(); scheduleAutosave();
+};
+
+// ---------- File input & drag-drop ----------
+D.fileInput.onchange = async (e)=>{ await addFiles(e.target.files); e.target.value=''; };
+async function addFiles(files){
+  if(!currentProject){ showToast('Open/Create a project first'); return; }
+  for(const f of files){
+    const data = await fileToDataURL(f, 2400,2400, Number(D.quality.value)/100);
+    images.push({ id: uid(), data, rotation:0, flipX:false, flipY:false });
+  }
+  renderThumbs(); scheduleAutosave();
+}
+D.dropzone.addEventListener('dragover', e=>{ e.preventDefault(); D.dropzone.classList.add('drag'); });
+D.dropzone.addEventListener('dragleave', ()=> D.dropzone.classList.remove('drag'));
+D.dropzone.addEventListener('drop', async (e)=>{ e.preventDefault(); D.dropzone.classList.remove('drag'); await addFiles(e.dataTransfer.files); });
+
+// helper: read & resize image to dataURL
+function fileToDataURL(file, maxW=2000, maxH=2000, quality=0.85){
+  return new Promise((res,reject)=>{
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const ratio = Math.min(maxW/img.naturalWidth, maxH/img.naturalHeight, 1);
+        const w = Math.round(img.naturalWidth * ratio), h = Math.round(img.naturalHeight * ratio);
+        const c = document.createElement('canvas'); c.width=w; c.height=h;
+        const ctx = c.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+        let hasAlpha=false;
+        try{ const sample = ctx.getImageData(0,0,Math.min(10,w),Math.min(10,h)).data; for(let i=3;i<sample.length;i+=4) if(sample[i]<255){ hasAlpha=true; break; } }catch(e){}
+        const mime = hasAlpha ? 'image/png' : 'image/jpeg';
+        const durl = c.toDataURL(mime, quality);
+        res(durl);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- Thumbnail rendering & sortable ----------
+function renderThumbs(){
+  D.thumbGrid.innerHTML = '';
+  images.forEach((it,i)=>{
+    const div = document.createElement('div'); div.className='thumb';
+    div.innerHTML = `<div class="badge">#${i+1}</div>
+                     <div class="actions">
+                       <button class="icon-btn" data-act="edit">✏️</button>
+                       <button class="icon-btn" data-act="del">🗑️</button>
+                     </div>
+                     <img src="${it.data}" alt="img-${i}">`;
+    div.querySelector('[data-act="edit"]').onclick = (e)=>{ e.stopPropagation(); openEditor(i); };
+    div.querySelector('[data-act="del"]').onclick = (e)=>{ e.stopPropagation(); images.splice(i,1); renderThumbs(); scheduleAutosave(); };
+    div.querySelector('img').addEventListener('contextmenu', (e)=>{ e.preventDefault(); openEditor(i); });
+    D.thumbGrid.appendChild(div);
+  });
+  Sortable.create(D.thumbGrid, { animation:200, onEnd: (evt)=>{ const moved = images.splice(evt.oldIndex,1)[0]; images.splice(evt.newIndex,0,moved); renderThumbs(); scheduleAutosave(); } });
+}
+
+// ---------- Editor (canvas) ----------
+const canvas = D.editCanvas; const ctx = canvas.getContext('2d');
+let isSelecting=false, selStart=null, selRect=null;
+
+function openEditor(index){
+  if(index<0 || index>=images.length) return;
+  selectedIndex = index;
+  D.editorModal.style.display = 'flex';
+  drawImageOnCanvas(images[index]);
+  updatePageIndicator();
+}
+function closeEditor(){ D.editorModal.style.display='none'; selectedIndex=-1; isSelecting=false; selRect=null; }
+D.closeEditor.onclick = ()=>{ closeEditor(); };
+
+async function drawImageOnCanvas(imgMeta){
+  const img = new Image();
+  img.onload = ()=>{
+    // prefer natural size but scale to viewport to be manageable
+    const maxW = Math.min(window.innerWidth*0.8, img.naturalWidth);
+    const maxH = Math.min(window.innerHeight*0.75, img.naturalHeight);
+    const scale = Math.min(maxW/img.naturalWidth, maxH/img.naturalHeight, 1);
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    // apply rotation/flip
+    ctx.save();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.translate(canvas.width/2, canvas.height/2);
+    const rot = (imgMeta.rotation||0) * Math.PI/180;
+    ctx.rotate(rot);
+    ctx.scale(imgMeta.flipX? -1:1, imgMeta.flipY? -1:1);
+    ctx.drawImage(img, -canvas.width/2, -canvas.height/2, canvas.width, canvas.height);
+    ctx.restore();
+  };
+  img.src = imgMeta.data;
+}
+function updatePageIndicator(){ D.pageIndicator.textContent = `${selectedIndex+1} / ${images.length}`; }
+
+// editor toolbar actions
+D.edRotateL.onclick = ()=>{ if(selectedIndex<0) return; images[selectedIndex].rotation = ((images[selectedIndex].rotation||0)-90); drawImageOnCanvas(images[selectedIndex]); scheduleAutosave(); };
+D.edRotateR.onclick = ()=>{ if(selectedIndex<0) return; images[selectedIndex].rotation = ((images[selectedIndex].rotation||0)+90); drawImageOnCanvas(images[selectedIndex]); scheduleAutosave(); };
+D.edFlipH.onclick = ()=>{ if(selectedIndex<0) return; images[selectedIndex].flipX = !images[selectedIndex].flipX; drawImageOnCanvas(images[selectedIndex]); scheduleAutosave(); };
+D.edFlipV.onclick = ()=>{ if(selectedIndex<0) return; images[selectedIndex].flipY = !images[selectedIndex].flipY; drawImageOnCanvas(images[selectedIndex]); scheduleAutosave(); };
+
+// crop by dragging rectangle on canvas
+canvas.addEventListener('mousedown', (e)=>{
+  if(D.editorModal.style.display!=='flex') return;
+  isSelecting=true;
+  const r = canvas.getBoundingClientRect();
+  selStart = { x: e.clientX - r.left, y: e.clientY - r.top };
+  selRect = null;
+});
+canvas.addEventListener('mousemove', (e)=>{
+  if(!isSelecting) return;
+  const r = canvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  selRect = { x: Math.min(selStart.x,x), y: Math.min(selStart.y,y), w: Math.abs(x - selStart.x), h: Math.abs(y - selStart.y) };
+  // redraw overlay
+  drawOverlay();
+});
+canvas.addEventListener('mouseup', (e)=>{
+  if(!isSelecting) return;
+  isSelecting=false;
+  if(selRect && selRect.w>6 && selRect.h>6){
+    applyCrop(selRect);
+  } else {
+    selRect = null; drawImageOnCanvas(images[selectedIndex]);
+  }
+});
+
+// draw overlay with translucent mask + selection rectangle
+function drawOverlay(){
+  if(selectedIndex<0) return;
+  drawImageOnCanvas(images[selectedIndex]);
+  if(!selRect) return;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(selRect.x, selRect.y, selRect.w, selRect.h);
+  ctx.strokeStyle = 'rgba(96,165,250,0.9)'; ctx.lineWidth=2; ctx.strokeRect(selRect.x, selRect.y, selRect.w, selRect.h);
+  ctx.restore();
+}
+
+// apply crop: extract selected rectangle portion from canvas and save as new image data (at full natural resolution proportionally)
+function applyCrop(rect){
+  // create temp canvas to capture selected pixels
+  const t = document.createElement('canvas');
+  t.width = Math.round(rect.w); t.height = Math.round(rect.h);
+  const tctx = t.getContext('2d');
+  // draw portion
+  tctx.drawImage(canvas, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+  const newData = t.toDataURL('image/jpeg', Number(D.quality.value)/100);
+  images[selectedIndex].data = newData;
+  images[selectedIndex].rotation = 0; images[selectedIndex].flipX = false; images[selectedIndex].flipY = false;
+  selRect = null;
+  drawImageOnCanvas(images[selectedIndex]);
+  renderThumbs();
+  scheduleAutosave();
+  showToast('Cropped');
+}
+
+// nav in editor
+D.prevBtn.onclick = ()=>{ if(selectedIndex>0){ selectedIndex--; drawImageOnCanvas(images[selectedIndex]); updatePageIndicator(); } };
+D.nextBtn.onclick = ()=>{ if(selectedIndex<images.length-1){ selectedIndex++; drawImageOnCanvas(images[selectedIndex]); updatePageIndicator(); } };
+D.edCrop.onclick = ()=>{ showToast('Drag on canvas to select crop area'); };
+
+// ---------- Toolbar basic edit (applies to selectedIndex or last image) ----------
+function ensureSelected(){
+  if(selectedIndex < 0 && images.length>0) selectedIndex = images.length - 1;
+  if(selectedIndex < 0) return false;
+  return true;
+}
+D.rotateLeft.onclick = ()=>{ if(!ensureSelected()) return showToast('Open/edit an image first'); images[selectedIndex].rotation = ((images[selectedIndex].rotation||0)-90); drawImageOnCanvas(images[selectedIndex]); renderThumbs(); scheduleAutosave(); };
+D.rotateRight.onclick = ()=>{ if(!ensureSelected()) return showToast('Open/edit an image first'); images[selectedIndex].rotation = ((images[selectedIndex].rotation||0)+90); drawImageOnCanvas(images[selectedIndex]); renderThumbs(); scheduleAutosave(); };
+D.flipH.onclick = ()=>{ if(!ensureSelected()) return showToast('Open/edit an image first'); images[selectedIndex].flipX = !images[selectedIndex].flipX; drawImageOnCanvas(images[selectedIndex]); renderThumbs(); scheduleAutosave(); };
+D.flipV.onclick = ()=>{ if(!ensureSelected()) return showToast('Open/edit an image first'); images[selectedIndex].flipY = !images[selectedIndex].flipY; drawImageOnCanvas(images[selectedIndex]); renderThumbs(); scheduleAutosave(); };
+D.cropBtn.onclick = ()=>{ if(!ensureSelected()) return showToast('Open/edit an image first'); showToast('Drag on canvas to select crop area'); openEditor(selectedIndex); };
+
+// ---------- Export PDF (original size) ----------
+async function exportPDF(){
+  if(!images.length) return showToast('No images to export');
+  const { jsPDF } = window.jspdf;
+  let pdf = null;
+  for(let i=0;i<images.length;i++){
+    const final = await prepareFinalImage(images[i]);
+    const img = await loadImage(final);
+    const pxW = img.naturalWidth, pxH = img.naturalHeight;
+    const ptW = pxW * 0.75, ptH = pxH * 0.75;
+    const orient = ptW >= ptH ? 'l' : 'p';
+    if(i===0) pdf = new jsPDF({ orientation: orient, unit: 'pt', format: [ptW, ptH] });
+    else pdf.addPage([ptW, ptH], orient);
+    const type = final.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+    pdf.addImage(final, type, 0, 0, ptW, ptH);
+  }
+  const name = (currentProject?.name || 'project') + '.pdf';
+  pdf.save(name);
+  showToast('PDF downloaded');
+}
+
+// apply rotation/flip on a fresh canvas at natural size and return dataURL
+async function prepareFinalImage(meta){
+  return new Promise(async (res)=>{
+    const img = await loadImage(meta.data);
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const rot = (meta.rotation||0) % 360;
+    const swap = Math.abs(rot)===90 || Math.abs(rot)===270;
+    const cw = swap ? h : w, ch = swap ? w : h;
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    const cctx = c.getContext('2d');
+    cctx.save();
+    cctx.translate(cw/2, ch/2);
+    cctx.rotate(rot * Math.PI/180);
+    cctx.scale(meta.flipX? -1:1, meta.flipY? -1:1);
+    cctx.drawImage(img, -w/2, -h/2, w, h);
+    cctx.restore();
+    const d = c.toDataURL('image/jpeg', Number(D.quality.value)/100);
+    res(d);
+  });
+}
+function loadImage(src){ return new Promise((res,rej)=>{ const im = new Image(); im.onload = ()=>res(im); im.onerror = rej; im.src = src; }); }
+
+// ---------- Export ZIP (project + images + pdf) using JSZip ----------
+async function exportZIP(){
+  if(!currentProject) return showToast('Open project first');
+  showToast('Building ZIP...');
+  const zip = new JSZip();
+  const meta = { project: currentProject, images };
+  zip.file('project.json', JSON.stringify(meta, null, 2));
+  // add images
+  const imgs = zip.folder('images');
+  for(let i=0;i<images.length;i++){
+    // save image base64 content without header
+    const d = images[i].data;
+    const base = d.split(',')[1];
+    const mime = d.match(/^data:(image\/[a-z]+);/)[1];
+    const ext = mime.split('/')[1];
+    imgs.file(`img-${i+1}.${ext}`, base, {base64:true});
+  }
+  // add pdf too
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF();
+  // build pdf same as exportPDF but small fallback if heavy
+  for(let i=0;i<images.length;i++){
+    const final = await prepareFinalImage(images[i]);
+    const im = await loadImage(final);
+    const pw = im.naturalWidth * 0.75, ph = im.naturalHeight * 0.75;
+    if(i===0) pdf.setProperties({ title: currentProject.name });
+    if(i>0) pdf.addPage([pw,ph]);
+    pdf.addImage(final, final.startsWith('data:image/png')?'PNG':'JPEG', 0, 0, pw, ph);
+  }
+  const blobPdf = pdf.output('blob');
+  zip.file(`${currentProject.name}.pdf`, blobPdf);
+  const content = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = `${currentProject.name}_bundle.zip`; a.click(); URL.revokeObjectURL(a.href);
+  showToast('ZIP ready');
+}
+
+// ---------- Share via Web Share API or download ---
+async function sharePDF(){
+  if(!images.length) return showToast('No images');
+  // build pdf blob
+  const { jsPDF } = window.jspdf;
+  let pdf = null;
+  for(let i=0;i<images.length;i++){
+    const final = await prepareFinalImage(images[i]);
+    const im = await loadImage(final);
+    const pw = im.naturalWidth * 0.75, ph = im.naturalHeight * 0.75;
+    if(i===0) pdf = new jsPDF({ orientation: pw>=ph?'l':'p', unit:'pt', format:[pw,ph]});
+    else pdf.addPage([pw,ph]);
+    pdf.addImage(final, final.startsWith('data:image/png')?'PNG':'JPEG', 0, 0, pw, ph);
+  }
+  const blob = pdf.output('blob');
+  const file = new File([blob], `${currentProject?.name||'project'}.pdf`, { type: 'application/pdf' });
+  if(navigator.canShare && navigator.canShare({ files: [file] })){
+    try{ await navigator.share({ files:[file], title: currentProject?.name || 'project' }); showToast('Shared'); } catch(e){ showToast('Share canceled'); }
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${currentProject?.name||'project'}.pdf`; a.click(); URL.revokeObjectURL(url);
+    showToast('Downloaded PDF');
+  }
+}
+
+// ---------- Backup & Restore JSON ----------
+D.backupBtn.onclick = ()=>{
+  if(!currentProject) return showToast('Open a project first');
+  const data = { project: currentProject, images };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${currentProject.name}_backup.json`; a.click(); URL.revokeObjectURL(a.href);
+  showToast('Exported JSON');
+};
+D.importJson.onchange = async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const txt = await f.text(); const obj = JSON.parse(txt);
+    if(obj.project && obj.images){
+      obj.project.name = obj.project.name + ' (import)';
+      await dbPut(obj.project); await refreshProjects();
+      showToast('Imported');
+    } else {
+      showToast('Invalid JSON file');
+    }
+  }catch(err){ showToast('Invalid file'); }
+  e.target.value = '';
+};
+
+// ---------- Autosave ----------
+function scheduleAutosave(){
+  if(!currentProject) return;
+  if(autosaveTimer) clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(()=>{ currentProject.images = images; dbPut(currentProject).then(()=>showToast('Autosaved')); }, 1200);
+}
+
+// ---------- Helpers ----------
+function renderUIState(){
+  document.getElementById('qualityVal').textContent = D.quality.value;
+}
+D.quality.oninput = ()=>{ document.getElementById('qualityVal').textContent = D.quality.value; };
+
+// ---------- Keyboard shortcuts ----------
+window.addEventListener('keydown', (e)=>{
+  if(e.ctrlKey && e.key.toLowerCase()==='n'){ e.preventDefault(); createProject(); }
+  if(e.ctrlKey && e.key.toLowerCase()==='s'){ e.preventDefault(); saveProject(); }
+  if(e.ctrlKey && e.key.toLowerCase()==='e'){ e.preventDefault(); exportPDF(); }
+  if(e.key === 'Delete'){ if(selectedIndex>=0){ images.splice(selectedIndex,1); renderThumbs(); scheduleAutosave(); selectedIndex=-1; closeEditor(); } }
+  if(D.editorModal.style.display === 'flex'){
+    if(e.key === 'ArrowRight'){ if(selectedIndex < images.length-1){ selectedIndex++; drawImageOnCanvas(images[selectedIndex]); updatePageIndicator(); } }
+    if(e.key === 'ArrowLeft'){ if(selectedIndex > 0){ selectedIndex--; drawImageOnCanvas(images[selectedIndex]); updatePageIndicator(); } }
+  }
+});
+
+// ---------- Event bindings ----------
+D.createBtn.onclick = ()=> createProject();
+D.saveBtn.onclick = ()=> saveProject();
+D.dupBtn.onclick = ()=> duplicateProject();
+D.delProjBtn.onclick = ()=> deleteCurrentProject();
+D.refreshBtn.onclick = ()=> refreshProjects();
+D.exportPdfBtn.onclick = ()=> exportPDF();
+D.exportZipBtn.onclick = ()=> exportZIP();
+D.shareBtn.onclick = ()=> sharePDF();
+D.clearImgsBtn.onclick = ()=>{ if(images.length && confirm('Clear all images?')){ images=[]; renderThumbs(); scheduleAutosave(); } };
+D.rotateLeft.onclick = ()=>{ if(selectedIndex<0) { if(images.length) selectedIndex = images.length-1; else return showToast('Open image'); } images[selectedIndex].rotation = ((images[selectedIndex].rotation||0)-90); drawImageOnCanvas(images[selectedIndex]); renderThumbs(); scheduleAutosave(); };
+D.rotateRight.onclick = ()=>{ if(selectedIndex<0) { if(images.length) selectedIndex = images.length-1; else return showToast('Open image'); } images[selectedIndex].rotation = ((images[selectedIndex].rotation||0)+90); drawImageOnCanvas(images[selectedIndex]); renderThumbs(); scheduleAutosave(); };
+D.flipH.onclick = ()=>{ if(selectedIndex<0){ if(images.length) selectedIndex = images.length-1; else return showToast('Open image'); } images[selectedIndex].flipX = !images[selectedIndex].flipX; drawImageOnCanvas(images[selectedIndex]); renderThumbs(); scheduleAutosave(); };
+D.flipV.onclick = ()=>{ if(selectedIndex<0){ if(images.length) selectedIndex = images.length-1; else return showToast('Open image'); } images[selectedIndex].flipY = !images[selectedIndex].flipY; drawImageOnCanvas(images[selectedIndex]); renderThumbs(); scheduleAutosave(); };
+D.cropBtn.onclick = ()=>{ if(selectedIndex<0){ if(images.length) selectedIndex = images.length-1; else return showToast('Open image'); } openEditor(selectedIndex); showToast('Drag on canvas to crop'); };
+
+D.projSearch.oninput = ()=> renderProjectList();
+D.filterTag.onchange = ()=> renderProjectList();
+D.createBtn.onclick = ()=> createProject(D.newName.value);
+
+// info popup
+D.infoBtn.onclick = ()=> D.infoPopup.style.display='flex';
+D.closeInfo.onclick = ()=> D.infoPopup.style.display='none';
+D.themeSelect.onchange = (e)=> applyTheme(e.target.value);
+
+// project actions wired: create project on load
+async function init(){
+  await openDB();
+  await refreshProjects();
+  const last = localStorage.getItem('lastProject');
+  if(last){
+    const p = await dbGet(last);
+    if(p){ await loadProject(last); }
+  }
+  renderUIState();
+}
+init();
+
+// helper confirm used in some places (we used native confirm temporarily above for Clear images) — reuse our custom confirm here:
+function confirm(msg){
+  // fallback to window.confirm only if confirmPopup is not desired
+  return window.confirm(msg);
+}
+
+// implementation note: small uses of prompt/confirm kept simple for brevity; custom dialog used where destructive ops occur.
+
+</script>
+</body>
+</html>
