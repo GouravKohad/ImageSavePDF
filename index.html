@@ -93,12 +93,12 @@
       </div>
       <div class="row">
         <input id="searchProjects" type="text" placeholder="Search projects…">
-        <select id="theme">
+        <select id="theme" style="display:none;">
           <option value="dark">Dark</option>
           <option value="light">Light</option>
           <option value="pastel">Pastel</option>
         </select>
-        <button id="howBtn" class="btn ghost sm"><i class="ph ph-info"></i> How to use</button>
+        <button id="howBtn" class="btn ghost sm" style="width:15vw;"><i class="ph ph-info"></i> How to use</button>
       </div>
     </header>
 
@@ -124,8 +124,8 @@
         </div>
 
         <div class="row">
-          <button id="exportAllBtn" class="btn ghost sm"><i class="ph ph-file-archive"></i> Export All</button>
-          <button id="importBtn" class="btn ghost sm"><i class="ph ph-upload"></i> Import</button>
+          <button id="exportAllBtn" class="btn ghost sm" style="display:none;"><i class="ph ph-file-archive"></i> Export All</button>
+          <button id="importBtn" class="btn ghost sm" ><i class="ph ph-upload" "></i> Import</button>
           <input id="importFile" type="file" accept="application/json" style="display:none">
         </div>
       </aside>
@@ -170,7 +170,7 @@
           <button id="rotR" class="btn ghost sm"><i class="ph ph-arrow-clockwise"></i> Rotate</button>
           <button id="flipH" class="btn ghost sm"><i class="ph ph-arrows-left-right"></i> Flip H</button>
           <button id="flipV" class="btn ghost sm"><i class="ph ph-arrows-up-down"></i> Flip V</button>
-          <button id="cropBtn" class="btn ghost sm"><i class="ph ph-crop"></i> Crop</button>
+          <button id="cropBtn" class="btn ghost sm" style="display:none;"><i class="ph ph-crop"></i> Crop</button>
           <button id="closeEditor" class="btn primary"><i class="ph ph-x"></i> Close</button>
         </div>
       </div>
